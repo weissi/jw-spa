@@ -60,6 +60,8 @@ button.go:active{transform:scale(.99);}
 .tile small{display:block;font-size:10px;font-weight:600;opacity:.9;margin-top:2px;}
 .tile.sel{border-color:var(--ink);}
 .tile .bdot{display:block;width:5px;height:5px;border-radius:99px;background:#fff;margin:5px auto 0;opacity:.9;}
+.result.clickable{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.result.sel{outline:2px solid var(--ink);outline-offset:2px;}
 .result .dose{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
 .result .dose small{font-size:14px;font-weight:600;color:var(--muted);}
 .meta{display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;}
@@ -110,7 +112,7 @@ footer .v{font-variant-numeric:tabular-nums;}
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.3 · build 2026-10-04 10:58 BST</div>
+    <div class="v">v1.4 · build 2026-10-04 11:02 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -134,8 +136,8 @@ footer .v{font-variant-numeric:tabular-nums;}
     return 'hsl('+h+',62%,42%)';
   }
 
-  function cardHTML(r, badgeHTML, pct){
-    return '<div class="result'+(r.dose===bestDose?' best':'')+'">'+
+  function cardHTML(r, badgeHTML, pct, cls, attrs){
+    return '<div class="result'+(r.dose===bestDose?' best':'')+(cls?' '+cls:'')+'"'+(attrs?' '+attrs:'')+'>'+
       '<div class="badges">'+badgeHTML+'</div>'+
       '<div class="dose">'+fmt(r.dose)+' <small>g per coffee</small></div>'+
       '<div class="meta"><div><b>'+r.n+'</b>coffees</div>'+
@@ -169,7 +171,8 @@ footer .v{font-variant-numeric:tabular-nums;}
     resEl.innerHTML=top.map(function(r){
       var pct=Math.max(4,Math.round(r.loss/maxL*100));
       var badge=r.dose===bestDose?'<span class="badge">Lowest waste</span>':'';
-      return cardHTML(r,badge,pct);
+      var cls='clickable'+(r.dose===selectedDose?' sel':'');
+      return cardHTML(r,badge,pct,cls,'data-dose="'+r.dose+'"');
     }).join('');
   }
 
@@ -181,9 +184,23 @@ footer .v{font-variant-numeric:tabular-nums;}
         fmt(r.dose)+'<small>'+fmt(r.loss)+'g left</small>'+dot+'</div>';
     }).join('');
     ribbonWrap.style.display='block';
+  }
+
+  function centerRibbon(animated){
+    // Run after layout settles; instant (no smooth-scroll animation) for the
+    // initial position, animated glide for user taps.
     var focusDose=(selectedDose!==null?selectedDose:bestDose);
-    var focus=ribbonEl.querySelector('[data-dose="'+focusDose+'"]');
-    if(focus){ ribbonEl.scrollLeft=focus.offsetLeft-ribbonEl.clientWidth/2+focus.clientWidth/2; }
+    requestAnimationFrame(function(){
+      var focus=ribbonEl.querySelector('[data-dose="'+focusDose+'"]');
+      if(!focus) return;
+      var x=focus.offsetLeft-ribbonEl.clientWidth/2+focus.clientWidth/2;
+      if(animated){ ribbonEl.scrollLeft=x; return; }
+      var prev=ribbonEl.style.scrollBehavior;
+      ribbonEl.style.scrollBehavior='auto';
+      ribbonEl.scrollLeft=x;
+      void ribbonEl.offsetWidth;
+      ribbonEl.style.scrollBehavior=prev;
+    });
   }
 
   function renderSelected(){
@@ -222,6 +239,7 @@ footer .v{font-variant-numeric:tabular-nums;}
     bestDose=byLoss[0].dose;
     maxLossAll=Math.max.apply(null, allDivs.map(function(r){return r.loss;}).concat([0.001]));
     renderRibbon();
+    centerRibbon(false);
     renderSelected();
     renderTop();
     try{ localStorage.setItem('coffee-div', JSON.stringify({total:total,lo:lo,hi:hi})); }catch(e){}
@@ -233,7 +251,20 @@ footer .v{font-variant-numeric:tabular-nums;}
     var dose=parseFloat(t.getAttribute('data-dose'));
     selectedDose=(dose===selectedDose)?null:dose;
     renderRibbon();
+    centerRibbon(true);
     renderSelected();
+    renderTop();
+  });
+
+  resEl.addEventListener('click', function(e){
+    var c=e.target.closest?e.target.closest('.result.clickable'):null;
+    if(!c) return;
+    var dose=parseFloat(c.getAttribute('data-dose'));
+    selectedDose=(dose===selectedDose)?null:dose;
+    renderRibbon();
+    centerRibbon(true);
+    renderSelected();
+    renderTop();
   });
 
   goEl.addEventListener('click', suggest);
