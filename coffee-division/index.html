@@ -111,7 +111,7 @@ footer .v{font-variant-numeric:tabular-nums;}
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.6 · build 2026-10-04 11:08 BST</div>
+    <div class="v">v1.7 · build 2026-10-04 11:11 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -197,18 +197,18 @@ footer .v{font-variant-numeric:tabular-nums;}
   }
 
   function centerRibbon(animated){
-    // Run after layout settles; instant (no smooth-scroll animation) for the
-    // initial position, animated glide for user taps.
+    // Center the focus tile in the ribbon using the browser's own layout
+    // (scrollIntoView), not manual offset math. Instant for the initial
+    // position, smooth glide for user taps.
     var focusDose=(selectedDose!==null?selectedDose:bestDose);
     requestAnimationFrame(function(){
       var focus=ribbonEl.querySelector('[data-dose="'+focusDose+'"]');
       if(!focus) return;
-      var x=focus.offsetLeft-ribbonEl.clientWidth/2+focus.clientWidth/2;
-      if(animated){ ribbonEl.scrollLeft=x; return; }
       var prev=ribbonEl.style.scrollBehavior;
-      ribbonEl.style.scrollBehavior='auto';
-      ribbonEl.scrollLeft=x;
+      ribbonEl.style.scrollBehavior=animated?'':'auto';
       void ribbonEl.offsetWidth;
+      try{ focus.scrollIntoView({inline:'center',block:'nearest'}); }
+      catch(err){ focus.scrollIntoView(); }
       ribbonEl.style.scrollBehavior=prev;
     });
   }
