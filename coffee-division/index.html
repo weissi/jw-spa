@@ -47,8 +47,19 @@ button.go:active{transform:scale(.99);}
 .result{position:relative;background:var(--surface);border:1.5px solid var(--line);
   border-radius:16px;padding:16px;box-shadow:var(--shadow);}
 .result.best{border-color:var(--good);background:linear-gradient(180deg,var(--good-soft),var(--surface) 70%);}
-.badge{position:absolute;top:-11px;left:14px;background:var(--good);color:#fff;font-size:11.5px;
-  font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase;}
+.badges{position:absolute;top:-11px;left:14px;display:flex;gap:6px;}
+.badge{background:var(--good);color:#fff;font-size:11.5px;font-weight:700;padding:4px 10px;
+  border-radius:999px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
+.badge.sel{background:var(--accent);}
+.ribbon-wrap{margin-top:18px;}
+.ribbon-label{font-size:12.5px;color:var(--muted);margin-bottom:8px;font-weight:600;}
+.ribbon{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 12px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;}
+.tile{flex:0 0 auto;min-width:60px;text-align:center;padding:9px 6px;border-radius:12px;color:#fff;
+  font-weight:700;font-size:14px;cursor:pointer;border:2px solid transparent;
+  font-variant-numeric:tabular-nums;box-shadow:var(--shadow);-webkit-tap-highlight-color:transparent;}
+.tile small{display:block;font-size:10px;font-weight:600;opacity:.9;margin-top:2px;}
+.tile.sel{border-color:var(--ink);}
+.tile .bdot{display:block;width:5px;height:5px;border-radius:99px;background:#fff;margin:5px auto 0;opacity:.9;}
 .result .dose{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
 .result .dose small{font-size:14px;font-weight:600;color:var(--muted);}
 .meta{display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;}
@@ -91,10 +102,15 @@ footer .v{font-variant-numeric:tabular-nums;}
     <div class="hint">Every dose between min and max is tried in 0.1&nbsp;g steps — the precision of your scale. Suggestions are ranked by leftover beans.</div>
   </div>
 
+  <div class="ribbon-wrap" id="ribbonWrap" style="display:none">
+    <div class="ribbon-label">Every dose, coloured by waste &mdash; tap one for details</div>
+    <div class="ribbon" id="ribbon"></div>
+  </div>
+  <div id="selected"></div>
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.0 · build 2026-10-04 10:28 BST</div>
+    <div class="v">v1.1 · build 2026-10-04 10:54 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -104,45 +120,103 @@ footer .v{font-variant-numeric:tabular-nums;}
       mindEl=document.getElementById('mind'),
       maxdEl=document.getElementById('maxd'),
       goEl=document.getElementById('go'),
-      resEl=document.getElementById('results');
+      resEl=document.getElementById('results'),
+      ribbonWrap=document.getElementById('ribbonWrap'),
+      ribbonEl=document.getElementById('ribbon'),
+      selEl=document.getElementById('selected');
+
+  var allDivs=[], bestDose=null, selectedDose=null, maxLossAll=0.001;
 
   function fmt(x){ return (Math.round(x*10)/10).toFixed(1); }
+
+  function lossColor(loss){
+    var t=Math.min(1, loss/maxLossAll), h=Math.round(140-140*t);
+    return 'hsl('+h+',62%,42%)';
+  }
+
+  function cardHTML(r, badgeHTML, pct){
+    return '<div class="result'+(r.dose===bestDose?' best':'')+'">'+
+      '<div class="badges">'+badgeHTML+'</div>'+
+      '<div class="dose">'+fmt(r.dose)+' <small>g per coffee</small></div>'+
+      '<div class="meta"><div><b>'+r.n+'</b>coffees</div>'+
+      '<div><b>'+fmt(r.used)+' g</b>used</div>'+
+      '<div><b>'+fmt(r.loss)+' g</b>leftover</div></div>'+
+      '<div class="lossbar"><i style="width:'+pct+'%"></i></div></div>';
+  }
+
+  function renderTop(){
+    var top=allDivs.slice().sort(function(a,b){
+      return a.loss-b.loss || Math.abs(a.dose-20)-Math.abs(b.dose-20);
+    }).slice(0,5);
+    var maxL=Math.max.apply(null, top.map(function(r){return r.loss;}).concat([0.1]));
+    resEl.innerHTML=top.map(function(r){
+      var pct=Math.max(4,Math.round(r.loss/maxL*100));
+      var badge=r.dose===bestDose?'<span class="badge">Lowest waste</span>':'';
+      return cardHTML(r,badge,pct);
+    }).join('');
+  }
+
+  function renderRibbon(){
+    ribbonEl.innerHTML=allDivs.map(function(r){
+      var cls='tile'+(r.dose===selectedDose?' sel':'');
+      var dot=r.dose===bestDose?'<span class="bdot"></span>':'';
+      return '<div class="'+cls+'" data-dose="'+r.dose+'" style="background:'+lossColor(r.loss)+'">'+
+        fmt(r.dose)+'<small>'+fmt(r.loss)+'g left</small>'+dot+'</div>';
+    }).join('');
+    ribbonWrap.style.display='block';
+    var best=ribbonEl.querySelector('[data-dose="'+bestDose+'"]');
+    if(best){ ribbonEl.scrollLeft=best.offsetLeft-ribbonEl.clientWidth/2+best.clientWidth/2; }
+  }
+
+  function renderSelected(){
+    if(selectedDose===null){ selEl.innerHTML=''; return; }
+    var r=null, i;
+    for(i=0;i<allDivs.length;i++){ if(allDivs[i].dose===selectedDose){ r=allDivs[i]; break; } }
+    if(!r){ selEl.innerHTML=''; return; }
+    var pct=Math.max(4,Math.round(r.loss/maxLossAll*100));
+    var badges='<span class="badge sel">Selected</span>'+
+      (r.dose===bestDose?'<span class="badge">Lowest waste</span>':'');
+    selEl.innerHTML='<div style="margin-top:16px">'+cardHTML(r,badges,pct)+'</div>';
+    selEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
 
   function suggest(){
     var total=parseFloat(bagEl.value),
         lo=parseFloat(mindEl.value),
         hi=parseFloat(maxdEl.value);
-    if(!(total>0)){ resEl.innerHTML='<div class="empty">Enter how many grams are in the bag.</div>'; return; }
-    if(!(lo>0)||!(hi>0)){ resEl.innerHTML='<div class="empty">Enter a valid dose range.</div>'; return; }
+    if(!(total>0)){ resEl.innerHTML='<div class="empty">Enter how many grams are in the bag.</div>'; ribbonWrap.style.display='none'; selEl.innerHTML=''; return; }
+    if(!(lo>0)||!(hi>0)){ resEl.innerHTML='<div class="empty">Enter a valid dose range.</div>'; ribbonWrap.style.display='none'; selEl.innerHTML=''; return; }
     if(lo>hi){ var t=lo; lo=hi; hi=t; mindEl.value=lo; maxdEl.value=hi; }
-    var out=[], loT=Math.round(lo*10), hiT=Math.round(hi*10), d, dose, n, loss;
+    allDivs=[]; selectedDose=null;
+    var loT=Math.round(lo*10), hiT=Math.round(hi*10), d, dose, n, loss;
     for(d=loT; d<=hiT; d++){
       dose=d/10;
       n=Math.floor(total/dose+1e-9);
       if(n<1) continue;
       loss=Math.round((total-n*dose)*10)/10;
-      if(loss===0) loss=0; /* avoid -0 */
-      out.push({dose:dose,n:n,used:Math.round(n*dose*10)/10,loss:loss});
+      if(loss===0) loss=0;
+      allDivs.push({dose:dose,n:n,used:Math.round(n*dose*10)/10,loss:loss});
     }
-    if(!out.length){ resEl.innerHTML='<div class="empty">No full dose fits in this bag.</div>'; return; }
-    out.sort(function(a,b){
-      if(a.loss!==b.loss) return a.loss-b.loss;
-      return Math.abs(a.dose-20)-Math.abs(b.dose-20);
+    if(!allDivs.length){ resEl.innerHTML='<div class="empty">No full dose fits in this bag.</div>'; ribbonWrap.style.display='none'; selEl.innerHTML=''; return; }
+    var byLoss=allDivs.slice().sort(function(a,b){
+      return a.loss-b.loss || Math.abs(a.dose-20)-Math.abs(b.dose-20);
     });
-    var top=out.slice(0,5),
-        maxLoss=Math.max.apply(null, top.map(function(r){return r.loss;}).concat([0.1]));
-    resEl.innerHTML=top.map(function(r,i){
-      var pct=Math.max(4,Math.round(r.loss/maxLoss*100));
-      return '<div class="result'+(i===0?' best':'')+'">'+
-        (i===0?'<span class="badge">Lowest waste</span>':'')+
-        '<div class="dose">'+fmt(r.dose)+' <small>g per coffee</small></div>'+
-        '<div class="meta"><div><b>'+r.n+'</b>coffees</div>'+
-        '<div><b>'+fmt(r.used)+' g</b>used</div>'+
-        '<div><b>'+fmt(r.loss)+' g</b>leftover</div></div>'+
-        '<div class="lossbar"><i style="width:'+pct+'%"></i></div></div>';
-    }).join('');
+    bestDose=byLoss[0].dose;
+    maxLossAll=Math.max.apply(null, allDivs.map(function(r){return r.loss;}).concat([0.001]));
+    renderRibbon();
+    renderSelected();
+    renderTop();
     try{ localStorage.setItem('coffee-div', JSON.stringify({total:total,lo:lo,hi:hi})); }catch(e){}
   }
+
+  ribbonEl.addEventListener('click', function(e){
+    var t=e.target.closest?e.target.closest('.tile'):null;
+    if(!t) return;
+    var dose=parseFloat(t.getAttribute('data-dose'));
+    selectedDose=(dose===selectedDose)?null:dose;
+    renderRibbon();
+    renderSelected();
+  });
 
   goEl.addEventListener('click', suggest);
   [bagEl,mindEl,maxdEl].forEach(function(el){
