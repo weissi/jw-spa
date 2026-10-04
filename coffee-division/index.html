@@ -110,7 +110,7 @@ footer .v{font-variant-numeric:tabular-nums;}
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.2 · build 2026-10-04 10:56 BST</div>
+    <div class="v">v1.3 · build 2026-10-04 10:58 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -181,8 +181,9 @@ footer .v{font-variant-numeric:tabular-nums;}
         fmt(r.dose)+'<small>'+fmt(r.loss)+'g left</small>'+dot+'</div>';
     }).join('');
     ribbonWrap.style.display='block';
-    var best=ribbonEl.querySelector('[data-dose="'+bestDose+'"]');
-    if(best){ ribbonEl.scrollLeft=best.offsetLeft-ribbonEl.clientWidth/2+best.clientWidth/2; }
+    var focusDose=(selectedDose!==null?selectedDose:bestDose);
+    var focus=ribbonEl.querySelector('[data-dose="'+focusDose+'"]');
+    if(focus){ ribbonEl.scrollLeft=focus.offsetLeft-ribbonEl.clientWidth/2+focus.clientWidth/2; }
   }
 
   function renderSelected(){
