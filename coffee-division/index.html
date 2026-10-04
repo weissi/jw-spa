@@ -99,7 +99,7 @@ footer .v{font-variant-numeric:tabular-nums;}
       </div>
     </div>
     <button class="go" id="go">Suggest divisions</button>
-    <div class="hint">Every dose between min and max is tried in 0.1&nbsp;g steps — the precision of your scale. Suggestions are ranked by leftover beans.</div>
+    <div class="hint">Every dose between min and max is tried in 0.1&nbsp;g steps — the precision of your scale. Suggestions are ranked by leftover beans. Options that give the same number of coffees with more waste are hidden &mdash; unless the winner is very tight (under 0.2&nbsp;g leftover), when the safer runner-up is kept too.</div>
   </div>
 
   <div class="ribbon-wrap" id="ribbonWrap" style="display:none">
@@ -110,7 +110,7 @@ footer .v{font-variant-numeric:tabular-nums;}
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.1 · build 2026-10-04 10:54 BST</div>
+    <div class="v">v1.2 · build 2026-10-04 10:56 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -144,10 +144,27 @@ footer .v{font-variant-numeric:tabular-nums;}
       '<div class="lossbar"><i style="width:'+pct+'%"></i></div></div>';
   }
 
+  function byLoss(a,b){
+    return a.loss-b.loss || Math.abs(a.dose-20)-Math.abs(b.dose-20);
+  }
+
+  function pickSuggestions(){
+    // Group by number of coffees. Within a group, a dose leaving more waste
+    // than another dose with the same count is never worth picking -- drop it.
+    // Exception: when the group's winner is very tight (<0.2g leftover), keep
+    // the runner-up as the safer alternative.
+    var groups={}, kept=[];
+    allDivs.forEach(function(r){ (groups[r.n]=groups[r.n]||[]).push(r); });
+    Object.keys(groups).forEach(function(n){
+      var g=groups[n].sort(byLoss);
+      kept.push(g[0]);
+      if(g[0].loss<0.2 && g.length>1) kept.push(g[1]);
+    });
+    return kept.sort(byLoss);
+  }
+
   function renderTop(){
-    var top=allDivs.slice().sort(function(a,b){
-      return a.loss-b.loss || Math.abs(a.dose-20)-Math.abs(b.dose-20);
-    }).slice(0,5);
+    var top=pickSuggestions().slice(0,5);
     var maxL=Math.max.apply(null, top.map(function(r){return r.loss;}).concat([0.1]));
     resEl.innerHTML=top.map(function(r){
       var pct=Math.max(4,Math.round(r.loss/maxL*100));
