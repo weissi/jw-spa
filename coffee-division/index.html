@@ -108,11 +108,10 @@ footer .v{font-variant-numeric:tabular-nums;}
     <div class="ribbon-label">Every dose, coloured by waste &mdash; tap one for details</div>
     <div class="ribbon" id="ribbon"></div>
   </div>
-  <div id="selected"></div>
   <div class="results" id="results"></div>
 
   <footer>
-    <div class="v">v1.5 · build 2026-10-04 11:06 BST</div>
+    <div class="v">v1.6 · build 2026-10-04 11:08 BST</div>
     <div>Leftover = beans that don&rsquo;t make a full dose.</div>
   </footer>
 </div>
@@ -124,8 +123,7 @@ footer .v{font-variant-numeric:tabular-nums;}
       goEl=document.getElementById('go'),
       resEl=document.getElementById('results'),
       ribbonWrap=document.getElementById('ribbonWrap'),
-      ribbonEl=document.getElementById('ribbon'),
-      selEl=document.getElementById('selected');
+      ribbonEl=document.getElementById('ribbon');
 
   var allDivs=[], bestDose=null, selectedDose=null, maxLossAll=0.001;
 
@@ -170,9 +168,16 @@ footer .v{font-variant-numeric:tabular-nums;}
   }
 
   function renderTop(){
-    var top=topSuggestions();
-    var maxL=Math.max.apply(null, top.map(function(r){return r.loss;}).concat([0.1]));
-    resEl.innerHTML=top.map(function(r){
+    // The selected dose floats to the top with its SELECTED label; the rest
+    // of the top suggestions follow. Never duplicated.
+    var list=topSuggestions(), ordered=[], i, sel=null;
+    if(selectedDose!==null){
+      for(i=0;i<allDivs.length;i++){ if(allDivs[i].dose===selectedDose){ sel=allDivs[i]; break; } }
+      if(sel) ordered.push(sel);
+    }
+    list.forEach(function(r){ if(r.dose!==selectedDose) ordered.push(r); });
+    var maxL=Math.max.apply(null, ordered.map(function(r){return r.loss;}).concat([0.1]));
+    resEl.innerHTML=ordered.map(function(r){
       var pct=Math.max(4,Math.round(r.loss/maxL*100));
       var badge=(r.dose===bestDose?'<span class="badge">Lowest waste</span>':'')+
                 (r.dose===selectedDose?'<span class="badge sel">Selected</span>':'');
@@ -208,20 +213,6 @@ footer .v{font-variant-numeric:tabular-nums;}
     });
   }
 
-  function renderSelected(){
-    if(selectedDose===null){ selEl.innerHTML=''; return; }
-    var inTop=topSuggestions().some(function(r){ return r.dose===selectedDose; });
-    if(inTop){ selEl.innerHTML=''; return; } /* the list card already shows both badges */
-    var r=null, i;
-    for(i=0;i<allDivs.length;i++){ if(allDivs[i].dose===selectedDose){ r=allDivs[i]; break; } }
-    if(!r){ selEl.innerHTML=''; return; }
-    var pct=Math.max(4,Math.round(r.loss/maxLossAll*100));
-    var badges='<span class="badge sel">Selected</span>'+
-      (r.dose===bestDose?'<span class="badge">Lowest waste</span>':'');
-    selEl.innerHTML='<div style="margin-top:16px">'+cardHTML(r,badges,pct)+'</div>';
-    selEl.scrollIntoView({behavior:'smooth',block:'nearest'});
-  }
-
   function suggest(){
     var total=parseFloat(bagEl.value),
         lo=parseFloat(mindEl.value),
@@ -247,31 +238,31 @@ footer .v{font-variant-numeric:tabular-nums;}
     maxLossAll=Math.max.apply(null, allDivs.map(function(r){return r.loss;}).concat([0.001]));
     renderRibbon();
     centerRibbon(false);
-    renderSelected();
     renderTop();
     try{ localStorage.setItem('coffee-div', JSON.stringify({total:total,lo:lo,hi:hi})); }catch(e){}
+  }
+
+  function selectDose(dose){
+    selectedDose=(dose===selectedDose)?null:dose;
+    renderRibbon();
+    centerRibbon(true);
+    renderTop();
+    if(selectedDose!==null){
+      var first=resEl.querySelector('.result');
+      if(first) first.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
   }
 
   ribbonEl.addEventListener('click', function(e){
     var t=e.target.closest?e.target.closest('.tile'):null;
     if(!t) return;
-    var dose=parseFloat(t.getAttribute('data-dose'));
-    selectedDose=(dose===selectedDose)?null:dose;
-    renderRibbon();
-    centerRibbon(true);
-    renderSelected();
-    renderTop();
+    selectDose(parseFloat(t.getAttribute('data-dose')));
   });
 
   resEl.addEventListener('click', function(e){
     var c=e.target.closest?e.target.closest('.result.clickable'):null;
     if(!c) return;
-    var dose=parseFloat(c.getAttribute('data-dose'));
-    selectedDose=(dose===selectedDose)?null:dose;
-    renderRibbon();
-    centerRibbon(true);
-    renderSelected();
-    renderTop();
+    selectDose(parseFloat(c.getAttribute('data-dose')));
   });
 
   goEl.addEventListener('click', suggest);
