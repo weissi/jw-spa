@@ -1,5 +1,7 @@
 # jw-spa
 
+Disclaimer: These are all created by AI agents, I didn't read the code.
+
 A collection of tiny single-page apps. Each app lives in its own subdirectory
 and is a **single self-contained HTML file** — inline CSS and JavaScript, no
 frameworks, no build step, no external requests (no CDNs, no webfonts).
