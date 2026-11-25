@@ -14,6 +14,7 @@ Live at `https://weissi.github.io/jw-spa/` (GitHub Pages, `main` branch).
 | App | What it does |
 |-----|--------------|
 | [Coffee Division](coffee-division/) | Split a bag of coffee beans into even doses (18–22 g) with minimal leftover. |
+| [Dice Duel](dice-duel/) | Roll a die against the computer — higher roll takes the round, first to five wins the match. |
 
 ## Conventions
 
